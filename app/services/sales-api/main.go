@@ -2,7 +2,9 @@ package main
 
 import (
 	"errors"
+	"expvar"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ardanlabs/conf"
+	"github.com/clvx/service/app/services/sales-api/handlers"
 	"go.uber.org/automaxprocs/maxprocs"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -58,12 +61,12 @@ func run(log *zap.SugaredLogger) error {
 	cfg := struct {
 		conf.Version
 		Web struct {
-			APIHost         string        `config:"default:0.0.0.0:3000"`
-			DebugHost       string        `config:"default:0.0.0.0:4000"`
-			ReadTimeout     time.Duration `config:"default:5s"`
-			WriteTimeout    time.Duration `config:"default:10s"`
-			IdleTimeout     time.Duration `config:"default:120s"`
-			ShutdownTimeout time.Duration `config:"default:20s,mask"`
+			APIHost         string        `conf:"default:0.0.0.0:3000"`
+			DebugHost       string        `conf:"default:0.0.0.0:4000"`
+			ReadTimeout     time.Duration `conf:"default:5s"`
+			WriteTimeout    time.Duration `conf:"default:10s"`
+			IdleTimeout     time.Duration `conf:"default:120s"`
+			ShutdownTimeout time.Duration `conf:"default:20s,mask"`
 		}
 	}{
 		Version: conf.Version{
@@ -95,6 +98,27 @@ func run(log *zap.SugaredLogger) error {
 		return fmt.Errorf("generating config for output: %w", err)
 	}
 	log.Infow("startup", "config", out)
+
+	expvar.NewString("build").Set(build)
+
+	// ===========================================================
+	// Start Debugging Service
+	log.Infow("start", "status", "debug router started", "host", cfg.Web.DebugHost)
+
+	// The debug function returns a mux to listen and serve on for all the debug
+	// related endpoints. This include the standard library endpoints.
+
+	// Construct the mux for the debug calls.
+	debugMux := handlers.DebugStandardLibrary()
+
+	// Start the service listening for debug requests.
+	// Not concerned with shutting this down with load shedding.
+	go func() {
+		if err := http.ListenAndServe(cfg.Web.DebugHost, debugMux); err != nil {
+			log.Errorw("shutdown", "status", "debug router closed", "host", cfg.Web.DebugHost, "Error", err)
+		}
+	}()
+
 
 	// ===========================================================
 	shutdown := make(chan os.Signal, 1)
