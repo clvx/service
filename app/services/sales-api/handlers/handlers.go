@@ -67,13 +67,22 @@ type APIMuxConfig struct {
 // APIMux constructs an http.Handler with all application routes defined
 // Guideline: when it comes to an api you have data coming in (input) you can use a concrete type if you wanna use data based on what it is, or use an interface if you wanna use data based on what it can do. When the api returns data, use concrete data unless it's an error (error interface) or if you need an empty interface (discouraged)
 func APIMux(cfg APIMuxConfig) *web.App{
-	app := web.NewApp(cfg.Shutdown)
+
+	//construct the web.App which holds all routes as well.
+	app := web.NewApp(
+		cfg.Shutdown,
+	)
+
+	v1(app, cfg)
+	return app
+}
+
+// v1 binds all the version 1 routes
+func v1(app *web.App, cfg APIMuxConfig) {
+	const version = "v1"
 
 	tgh := testgrp.Handlers{
 		Log: cfg.Log,
 	}
-	
-	app.Handle(http.MethodGet, "/v1/test", tgh.Test)
-
-	return app
+	app.Handle(http.MethodGet, "v1", "/test", tgh.Test)
 }
