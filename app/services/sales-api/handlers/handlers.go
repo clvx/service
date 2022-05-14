@@ -10,7 +10,7 @@ import (
 
 	"github.com/clvx/service/app/services/sales-api/handlers/debug/checkgrp"
 	"github.com/clvx/service/app/services/sales-api/handlers/v1/testgrp"
-	"github.com/dimfeld/httptreemux/v5"
+	"github.com/clvx/service/foundation/web"
 	"go.uber.org/zap"
 )
 
@@ -66,14 +66,14 @@ type APIMuxConfig struct {
 
 // APIMux constructs an http.Handler with all application routes defined
 // Guideline: when it comes to an api you have data coming in (input) you can use a concrete type if you wanna use data based on what it is, or use an interface if you wanna use data based on what it can do. When the api returns data, use concrete data unless it's an error (error interface) or if you need an empty interface (discouraged)
-func APIMux(cfg APIMuxConfig) *httptreemux.ContextMux{
-	mux := httptreemux.NewContextMux()
+func APIMux(cfg APIMuxConfig) *web.App{
+	app := web.NewApp(cfg.Shutdown)
 
 	tgh := testgrp.Handlers{
 		Log: cfg.Log,
 	}
 	
-	mux.Handle(http.MethodGet, "/v1/test", tgh.Test)
+	app.Handle(http.MethodGet, "/v1/test", tgh.Test)
 
-	return mux
+	return app
 }
